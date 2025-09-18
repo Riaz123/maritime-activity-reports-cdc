@@ -278,7 +278,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - Apache Spark and Delta Lake communities
-- Maritime data providers
+- Open Source Maritime data providers [AISHub](https://www.aishub.net/)
+- Inspiration for implementation from https://open-ais.org/
 - Open source geospatial libraries
 - Google Cloud Platform team
 
