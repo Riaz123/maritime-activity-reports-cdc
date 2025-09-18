@@ -1,0 +1,154 @@
+# Maritime Activity Reports CDC/CDF - GCP Production Configuration
+
+# Project settings
+project_name: "maritime-activity-reports-cdc"
+version: "1.0.0"
+environment: "prod"  # Change to dev/staging as needed
+
+# Spark configuration optimized for Dataproc Serverless
+spark:
+  app_name: "Maritime-Activity-Reports-CDC-GCP"
+  executor_memory: "8g"
+  executor_cores: 4
+  executor_instances: 4
+  driver_memory: "4g"
+  driver_cores: 2
+  max_result_size: "2g"
+  
+  # GCP Dataproc optimizations
+  additional_configs:
+    "spark.sql.adaptive.enabled": "true"
+    "spark.sql.adaptive.coalescePartitions.enabled": "true"
+    "spark.sql.adaptive.skewJoin.enabled": "true"
+    "spark.sql.adaptive.skewJoin.skewedPartitionFactor": "5"
+    "spark.serializer": "org.apache.spark.serializer.KryoSerializer"
+    "spark.executor.memoryOverhead": "2g"
+    "spark.driver.memoryOverhead": "1g"
+    "spark.dynamicAllocation.enabled": "true"
+    "spark.dynamicAllocation.minExecutors": "2"
+    "spark.dynamicAllocation.maxExecutors": "10"
+    "spark.dynamicAllocation.initialExecutors": "4"
+
+# Data layer configurations for GCS
+bronze:
+  base_path: "gs://PROJECT_ID-maritime-data-ENVIRONMENT/bronze"
+  checkpoint_path: "gs://PROJECT_ID-maritime-checkpoints-ENVIRONMENT/bronze"
+  retention_days: 30
+  vacuum_hours: 168  # 7 days
+  table_properties:
+    "delta.autoOptimize.optimizeWrite": "true"
+    "delta.autoOptimize.autoCompact": "true"
+    "delta.logRetentionDuration": "30 days"
+
+silver:
+  base_path: "gs://PROJECT_ID-maritime-data-ENVIRONMENT/silver"
+  checkpoint_path: "gs://PROJECT_ID-maritime-checkpoints-ENVIRONMENT/silver"
+  retention_days: 60
+  vacuum_hours: 336  # 14 days
+  table_properties:
+    "delta.autoOptimize.optimizeWrite": "true"
+    "delta.autoOptimize.autoCompact": "true"
+    "delta.logRetentionDuration": "60 days"
+
+gold:
+  base_path: "gs://PROJECT_ID-maritime-data-ENVIRONMENT/gold"
+  checkpoint_path: "gs://PROJECT_ID-maritime-checkpoints-ENVIRONMENT/gold"
+  retention_days: 365
+  vacuum_hours: 720  # 30 days
+  table_properties:
+    "delta.autoOptimize.optimizeWrite": "true"
+    "delta.autoOptimize.autoCompact": "true"
+    "delta.logRetentionDuration": "365 days"
+
+# CDC/CDF configuration for production
+cdc:
+  enable_cdf: true
+  max_staleness_hours: 1  # More aggressive for production
+  processing_time_seconds: 30
+  checkpoint_location: "gs://PROJECT_ID-maritime-checkpoints-ENVIRONMENT/cdc"
+  watermark_delay: "5 minutes"  # Reduced for production
+
+# BigQuery configuration
+bigquery:
+  project_id: "PROJECT_ID"
+  dataset: "maritime_reports_ENVIRONMENT"
+  location: "europe-west2"
+  materialized_view_options:
+    max_staleness: "INTERVAL '1' HOUR"  # More frequent refresh for production
+    allow_non_incremental_definition: "true"
+
+# Google Cloud Storage configuration
+gcs:
+  bucket_name: "PROJECT_ID-maritime-data-ENVIRONMENT"
+  bronze_prefix: "bronze"
+  silver_prefix: "silver"
+  gold_prefix: "gold"
+  checkpoint_prefix: "checkpoints"
+
+# Maritime domain settings
+zone_types:
+  - "country_un_name"
+  - "eez"
+  - "continent"
+  - "subcontinent"
+  - "hrz_v2"
+  - "sanction"
+  - "seca"
+  - "inland"
+  - "port"
+
+vessel_types:
+  - "Bulk Carrier"
+  - "Container Ship"
+  - "Tanker"
+  - "General Cargo"
+  - "Fishing Vessel"
+  - "Passenger Ship"
+  - "Offshore Vessel"
+  - "LNG Carrier"
+  - "Chemical Tanker"
+  - "Product Tanker"
+
+# Data quality thresholds (production settings)
+max_speed_knots: 50.0
+min_latitude: -90.0
+max_latitude: 90.0
+min_longitude: -180.0
+max_longitude: 180.0
+
+# Logging configuration for GCP
+logging:
+  level: "INFO"
+  json_logs: true  # Required for Cloud Logging
+  log_file: null
+
+# Monitoring and alerting for production
+monitoring:
+  enable_metrics: true
+  metrics_interval_seconds: 30  # More frequent for production
+  health_check_interval_seconds: 60
+  
+  # GCP specific monitoring
+  enable_cloud_monitoring: true
+  enable_cloud_logging: true
+  
+  # Alert thresholds
+  error_rate_threshold: 0.05  # 5% error rate
+  latency_threshold_ms: 5000  # 5 second latency
+  data_staleness_threshold_hours: 2
+
+# Production-specific settings
+production:
+  enable_auto_scaling: true
+  enable_preemptible_instances: false  # Use regular instances for production
+  enable_backup: true
+  backup_retention_days: 90
+  
+  # Performance settings
+  optimize_frequency_hours: 6  # Optimize tables every 6 hours
+  vacuum_frequency_hours: 24   # Vacuum daily
+  
+  # Security settings
+  enable_encryption: true
+  enable_audit_logging: true
+  enable_vpc_firewall: true

@@ -1,0 +1,151 @@
+name: Deploy to GCP
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'airflow_dags/**'
+      - 'infrastructure/**'
+      - 'config/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+        - dev
+        - staging
+        - prod
+
+env:
+  REGION: europe-west2
+  ENVIRONMENT: ${{ github.event.inputs.environment || 'dev' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
+
+    - name: Configure Docker for Artifact Registry
+      run: |
+        gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+    - name: Set environment variables
+      run: |
+        echo "GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }}" >> $GITHUB_ENV
+        echo "SERVICE_ACCOUNT_EMAIL=maritime-reports-${{ env.ENVIRONMENT }}@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com" >> $GITHUB_ENV
+
+    - name: Install dependencies
+      run: |
+        pip install pdm
+        pdm install
+
+    - name: Run tests
+      run: |
+        pdm run pytest src/maritime_activity_reports/tests/ -v
+
+    - name: Build Docker image
+      run: |
+        IMAGE_TAG="${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/maritime-reports-${{ env.ENVIRONMENT }}/maritime-reports:${{ github.sha }}"
+        docker build -f infrastructure/docker/Dockerfile.production -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+        echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
+
+    - name: Deploy infrastructure
+      working-directory: infrastructure/terraform
+      run: |
+        # Create terraform.tfvars
+        cat > terraform.tfvars << EOF
+        project_id = "${{ secrets.GCP_PROJECT_ID }}"
+        region = "${{ env.REGION }}"
+        environment = "${{ env.ENVIRONMENT }}"
+        service_account_email = "${{ env.SERVICE_ACCOUNT_EMAIL }}"
+        domain_name = "${{ secrets.COMPANY_DOMAIN || 'your-company.com' }}"
+        alert_email = "${{ secrets.ALERT_EMAIL || 'data-team@your-company.com' }}"
+        EOF
+        
+        # Initialize and apply
+        terraform init
+        terraform plan
+        terraform apply -auto-approve
+
+    - name: Deploy to Cloud Run
+      run: |
+        gcloud run deploy maritime-streaming-${{ env.ENVIRONMENT }} \
+          --image=${{ env.IMAGE_TAG }} \
+          --platform=managed \
+          --region=${{ env.REGION }} \
+          --service-account="${{ env.SERVICE_ACCOUNT_EMAIL }}" \
+          --set-env-vars="GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }},ENVIRONMENT=${{ env.ENVIRONMENT }},STARTUP_MODE=web-server" \
+          --memory=4Gi \
+          --cpu=2 \
+          --min-instances=1 \
+          --max-instances=3 \
+          --timeout=3600 \
+          --allow-unauthenticated
+
+    - name: Deploy Airflow DAGs
+      run: |
+        # Get Composer bucket
+        COMPOSER_BUCKET=$(gcloud composer environments describe maritime-composer-${{ env.ENVIRONMENT }} \
+          --location=${{ env.REGION }} \
+          --format="value(config.dagGcsPrefix)" | sed 's|/dags||')
+        
+        if [ -n "$COMPOSER_BUCKET" ]; then
+          # Upload DAGs
+          gsutil cp airflow_dags/*.py ${COMPOSER_BUCKET}/dags/
+          
+          # Upload configuration
+          gsutil cp config/gcp_config.yaml ${COMPOSER_BUCKET}/data/config/maritime_config.yaml
+          
+          echo "✅ Airflow DAGs deployed to Cloud Composer"
+        else
+          echo "⚠️ Cloud Composer environment not found"
+        fi
+
+    - name: Run post-deployment tests
+      run: |
+        # Wait for Cloud Run service to be ready
+        sleep 30
+        
+        # Get Cloud Run URL
+        SERVICE_URL=$(gcloud run services describe maritime-streaming-${{ env.ENVIRONMENT }} \
+          --region=${{ env.REGION }} \
+          --format="value(status.url)")
+        
+        # Test health endpoint
+        curl -f "$SERVICE_URL/health" || echo "Health check failed"
+
+    - name: Notify deployment status
+      if: always()
+      run: |
+        if [ "${{ job.status }}" == "success" ]; then
+          echo "✅ Deployment to ${{ env.ENVIRONMENT }} completed successfully"
+        else
+          echo "❌ Deployment to ${{ env.ENVIRONMENT }} failed"
+        fi

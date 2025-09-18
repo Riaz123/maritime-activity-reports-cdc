@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+
+    - name: Install PDM
+      run: pip install pdm
+
+    - name: Install dependencies
+      run: pdm install --dev
+
+    - name: Run tests
+      run: pdm run pytest
+
+    - name: Build package
+      run: pdm build
+
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        body: |
+          ## What's Changed
+          
+          ### 🚢 Maritime Features
+          - Enhanced CDC/CDF processing capabilities
+          - Improved data quality validation
+          - New materialized views for analytics
+          
+          ### 🏗️ Infrastructure
+          - Updated GCP deployment configuration
+          - Enhanced monitoring and alerting
+          - Performance optimizations
+          
+          ### 🐛 Bug Fixes
+          - Various stability improvements
+          - Error handling enhancements
+          
+          ### 📚 Documentation
+          - Updated API documentation
+          - Improved deployment guides
+          - Enhanced troubleshooting section
+          
+          ## 🚀 Deployment
+          
+          ### Quick Start
+          ```bash
+          git clone https://github.com/your-org/maritime-activity-reports-cdc.git
+          cd maritime-activity-reports-cdc
+          make quick-start
+          ```
+          
+          ### GCP Deployment
+          ```bash
+          export GOOGLE_CLOUD_PROJECT="your-project-id"
+          make deploy-gcp-full
+          ```
+          
+          ## 📋 Full Changelog
+          
+          See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
+          
+        draft: false
+        prerelease: false
+
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./dist/maritime_activity_reports_cdc-*.whl
+        asset_name: maritime-activity-reports-cdc.whl
+        asset_content_type: application/octet-stream

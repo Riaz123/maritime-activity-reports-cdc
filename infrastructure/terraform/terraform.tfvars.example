@@ -1,0 +1,46 @@
+# Example Terraform variables for maritime activity reports
+# Copy this file to terraform.tfvars and customize for your environment
+
+# GCP Project Configuration
+project_id = "your-gcp-project-id"
+region     = "europe-west2"
+zone       = "europe-west2-a"
+
+# Environment Configuration
+environment = "dev"  # dev, staging, prod
+
+# Service Account
+service_account_email = "maritime-reports-dev@your-gcp-project-id.iam.gserviceaccount.com"
+
+# Domain for access control
+domain_name = "your-company.com"
+
+# Dataproc Configuration (for development clusters)
+dataproc_master_machine_type = "e2-standard-4"
+dataproc_worker_machine_type = "e2-standard-4"
+dataproc_worker_count        = 2
+
+# BigQuery Configuration
+bigquery_location = "europe-west2"
+
+# Cloud Composer Configuration
+composer_node_count    = 1
+composer_machine_type  = "e2-standard-2"
+
+# Cloud Run Configuration
+cloud_run_cpu           = "2000m"
+cloud_run_memory        = "4Gi"
+cloud_run_min_instances = 1
+cloud_run_max_instances = 3
+
+# Storage Configuration
+storage_retention_days = 90
+storage_nearline_days  = 30
+
+# Monitoring Configuration
+enable_monitoring = true
+alert_email      = "data-team@your-company.com"
+
+# Network Configuration (use existing VPC)
+network_name = "default"
+subnet_name  = "default"

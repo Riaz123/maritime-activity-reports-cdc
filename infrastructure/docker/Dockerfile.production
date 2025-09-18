@@ -1,0 +1,76 @@
+# Production Dockerfile for GCP deployment
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV GOOGLE_CLOUD_PROJECT=""
+ENV MARITIME_CONFIG_PATH="/app/config/maritime_config.yaml"
+
+# Set work directory
+WORKDIR /app
+
+# Install system dependencies including Java for Spark
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    git \
+    openjdk-11-jdk \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set JAVA_HOME
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+
+# Install PDM
+RUN pip install pdm
+
+# Copy dependency files
+COPY pyproject.toml pdm.lock* ./
+
+# Install dependencies
+RUN pdm install --prod --no-lock --no-editable
+
+# Copy source code
+COPY src/ src/
+COPY config/ config/
+COPY scripts/ scripts/
+
+# Install the package
+RUN pdm install --prod --no-lock --no-editable
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash maritime \
+    && chown -R maritime:maritime /app
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/checkpoints /app/tmp \
+    && chown -R maritime:maritime /app/logs /app/checkpoints /app/tmp
+
+# Switch to non-root user
+USER maritime
+
+# Copy startup script
+COPY infrastructure/docker/startup.sh /app/startup.sh
+USER root
+RUN chmod +x /app/startup.sh && chown maritime:maritime /app/startup.sh
+USER maritime
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD pdm run maritime-reports health-check --component spark || exit 1
+
+# Expose port for monitoring
+EXPOSE 8080
+
+# Default command
+CMD ["/app/startup.sh"]
+
+# Labels for container registry
+LABEL maintainer="Data Engineering Team <data-team@your-company.com>"
+LABEL version="1.0.0"
+LABEL description="Maritime Activity Reports CDC/CDF - Production"
+LABEL environment="production"
+LABEL cloud.provider="gcp"

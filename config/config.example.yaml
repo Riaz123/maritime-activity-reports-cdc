@@ -1,0 +1,124 @@
+# Maritime Activity Reports CDC/CDF Configuration
+# Copy this file to config.yaml and customize for your environment
+
+# Project settings
+project_name: "maritime-activity-reports-cdc"
+version: "1.0.0"
+environment: "dev"  # dev, staging, prod
+
+# Spark configuration
+spark:
+  app_name: "Maritime-Activity-Reports-CDC"
+  master: null  # Set to "local[*]" for local development
+  executor_memory: "4g"
+  executor_cores: 2
+  executor_instances: 2
+  driver_memory: "2g"
+  driver_cores: 1
+  max_result_size: "2g"
+  
+  # Additional Spark configurations
+  additional_configs:
+    "spark.sql.adaptive.enabled": "true"
+    "spark.sql.adaptive.coalescePartitions.enabled": "true"
+    "spark.sql.adaptive.skewJoin.enabled": "true"
+    "spark.serializer": "org.apache.spark.serializer.KryoSerializer"
+
+# Data layer configurations
+bronze:
+  base_path: "gs://your-maritime-data-bucket/bronze"
+  checkpoint_path: "gs://your-maritime-data-bucket/checkpoints/bronze"
+  retention_days: 30
+  vacuum_hours: 168  # 7 days
+  table_properties:
+    "delta.autoOptimize.optimizeWrite": "true"
+    "delta.autoOptimize.autoCompact": "true"
+
+silver:
+  base_path: "gs://your-maritime-data-bucket/silver"
+  checkpoint_path: "gs://your-maritime-data-bucket/checkpoints/silver"
+  retention_days: 30
+  vacuum_hours: 168
+  table_properties:
+    "delta.autoOptimize.optimizeWrite": "true"
+    "delta.autoOptimize.autoCompact": "true"
+
+gold:
+  base_path: "gs://your-maritime-data-bucket/gold"
+  checkpoint_path: "gs://your-maritime-data-bucket/checkpoints/gold"
+  retention_days: 90
+  vacuum_hours: 336  # 14 days
+  table_properties:
+    "delta.autoOptimize.optimizeWrite": "true"
+    "delta.autoOptimize.autoCompact": "true"
+
+# CDC/CDF configuration
+cdc:
+  enable_cdf: true
+  max_staleness_hours: 24
+  processing_time_seconds: 30
+  checkpoint_location: "gs://your-maritime-data-bucket/checkpoints/cdc"
+  watermark_delay: "10 minutes"
+
+# BigQuery configuration
+bigquery:
+  project_id: "your-gcp-project-id"
+  dataset: "maritime_reports"
+  location: "europe-west2"
+  materialized_view_options:
+    max_staleness: "INTERVAL '24' HOUR"
+    allow_non_incremental_definition: "true"
+
+# Google Cloud Storage configuration
+gcs:
+  bucket_name: "your-maritime-data-bucket"
+  bronze_prefix: "bronze"
+  silver_prefix: "silver"
+  gold_prefix: "gold"
+  checkpoint_prefix: "checkpoints"
+
+# Maritime domain settings
+zone_types:
+  - "country_un_name"
+  - "eez"
+  - "continent"
+  - "subcontinent"
+  - "hrz_v2"
+  - "sanction"
+  - "seca"
+  - "inland"
+  - "port"
+
+vessel_types:
+  - "Bulk Carrier"
+  - "Container Ship"
+  - "Tanker"
+  - "General Cargo"
+  - "Fishing Vessel"
+  - "Passenger Ship"
+  - "Offshore Vessel"
+
+# Data quality thresholds
+max_speed_knots: 50.0
+min_latitude: -90.0
+max_latitude: 90.0
+min_longitude: -180.0
+max_longitude: 180.0
+
+# Logging configuration
+logging:
+  level: "INFO"
+  json_logs: true
+  log_file: null  # Set path for file logging
+
+# Monitoring and alerting
+monitoring:
+  enable_metrics: true
+  metrics_interval_seconds: 60
+  health_check_interval_seconds: 300
+  
+# Development settings (only for dev environment)
+development:
+  simulate_data: false
+  num_test_vessels: 10
+  test_data_days: 7
