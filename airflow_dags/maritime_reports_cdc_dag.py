@@ -1,6 +1,5 @@
 """
 Airflow DAG for Maritime Activity Reports with CDC/CDF processing.
-Follows the same pattern as DE-ActivityReports-Daily-DataProc.py but with CDC/CDF enhancements.
 """
 
 import json
