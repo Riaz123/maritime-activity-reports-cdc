@@ -214,7 +214,6 @@ Create a `docs/images/` folder with:
 Your repository is now ready to be shared with:
 
 - ✅ **Data Engineers** looking for CDC/CDF solutions
-- ✅ **Maritime Industry** professionals
 - ✅ **Apache Spark** developers
 - ✅ **Delta Lake** enthusiasts
 - ✅ **GCP** users seeking real-world examples
@@ -226,4 +225,4 @@ Your repository is now ready to be shared with:
 - 📧 **Newsletters**: Submit to data engineering newsletters
 - 🏢 **Conferences**: Present at data engineering meetups
 
-**Congratulations on creating an enterprise-grade maritime data engineering solution! 🚢🎉**
+**Congratulations on creating an enterprise-grade data engineering solution! 🚢🎉**
