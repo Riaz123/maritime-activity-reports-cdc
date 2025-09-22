@@ -76,6 +76,17 @@ gcs:
   silver_prefix: "silver"
   gold_prefix: "gold"
   checkpoint_prefix: "checkpoints"
+  
+# Google Cloud Composer (Airflow) configuration
+composer:
+  # Composer (Airflow) environment name (optional, used by deploy scripts)
+  environment_name: "maritime-composer-dev"
+
+  # GCS location where the script is uploaded so Composer can see it
+  dataproc_submit_script_gcs: "gs://<composer-bucket>/data/scripts/dataproc_submit.sh"
+
+  # Runtime path inside Composer where Airflow executes it
+  dataproc_submit_script_runtime: "/home/airflow/gcs/data/scripts/dataproc_submit.sh"
 
 # Maritime domain settings
 zone_types:
